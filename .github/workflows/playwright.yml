@@ -9,6 +9,12 @@ on:
     # Nightly trip-wire: catches regressions even without a PR/commit.
     - cron: '0 2 * * *'
   workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'Base URL to test against'
+        required: false
+        default: 'https://pr-2-committee100.pantheonsite.io'
+    
 
 # Cancel superseded runs for the same branch/commit.
 concurrency:
@@ -19,6 +25,14 @@ jobs:
   test:
     timeout-minutes: 60
     runs-on: ubuntu-latest
+
+    env:
+      BASE_URL: ${{ github.event.inputs.base_url }}
+      WP_ADMIN_USER: ${{ secrets.WP_ADMIN_USER }}
+      WP_ADMIN_PASS: ${{ secrets.WP_ADMIN_PASS }}
+      WP_TEST_RECIPIENT_EMAIL: ${{ secrets.WP_TEST_RECIPIENT_EMAIL }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
     steps:
     - name: Checkout Repository
@@ -42,11 +56,10 @@ jobs:
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps chromium
 
+    - name: Show BASE_URL
+      run: 'echo "BASE_URL is: $BASE_URL"'
+
     - name: Run Playwright Tests
-      env:
-        WP_ADMIN_USER: ${{ secrets.WP_ADMIN_USER }}
-        WP_ADMIN_PASS: ${{ secrets.WP_ADMIN_PASS }}
-        WP_TEST_RECIPIENT_EMAIL: ${{ secrets.WP_TEST_RECIPIENT_EMAIL }}
       run: npx playwright test
 
     - name: Upload Snapshots
@@ -64,43 +77,40 @@ jobs:
         name: playwright-report
         path: playwright-report/
         retention-days: 30
-      - name: Notify Slack with Test Results
-        if: always()
-        uses: slackapi/slack-github-action@v1.27.0
-        with:
-          payload: |
-            {
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*GitHub Actions Test Run Complete* :rocket:\n*Repository:* ${{ github.repository }}\n*Status:* ${{ needs.test.result }}"
-                  }
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*📊 Playwright Test Summary*\n*Total:* ${{ needs.test.outputs.total }}\n*Passed:* :white_check_mark: ${{ needs.test.outputs.passed }}\n*Failed:* :x: ${{ needs.test.outputs.failed }}\n*Skipped:* :fast_forward: ${{ needs.test.outputs.skipped }}"
-                  }
-                },
-                {
-                  "type": "actions",
-                  "elements": [
-                    {
-                      "type": "button",
-                      "text": {
-                        "type": "plain_text",
-                        "text": "View Workflow Run"
-                      },
-                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                    }
-                  ]
+    - name: Notify Slack with Test Results
+      if: always()
+      uses: slackapi/slack-github-action@v1.27.0
+      with:
+        payload: |
+          {
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "*GitHub Actions Test Run Complete* :rocket:\n*Repository:* ${{ github.repository }}\n*Status:* ${{ needs.test.result }}"
                 }
-              ]
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK  
+              },
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "*📊 Playwright Test Summary*\n*Total:* ${{ needs.test.outputs.total }}\n*Passed:* :white_check_mark: ${{ needs.test.outputs.passed }}\n*Failed:* :x: ${{ needs.test.outputs.failed }}\n*Skipped:* :fast_forward: ${{ needs.test.outputs.skipped }}"
+                }
+              },
+              {
+                "type": "actions",
+                "elements": [
+                  {
+                    "type": "button",
+                    "text": {
+                      "type": "plain_text",
+                      "text": "View Workflow Run"
+                    },
+                    "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                  }
+                ]
+              }
+            ]
+          }
           

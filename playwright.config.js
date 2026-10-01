@@ -18,7 +18,7 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests',
   fullyParallel: false, // screenshots are more stable run one at a time
-  workers: 2,
+  workers: 8,
   retries: process.env.CI ? 1 : 0,
   timeout: 60_000,
   reporter: [['html', { open: 'never' }], ['list']],
@@ -39,7 +39,7 @@ export default defineConfig({
   },
 
   use: {
-    baseURL: 'https://pr-2-committee100.pantheonsite.io',
+    baseURL: process.env.BASE_URL || 'https://pr-2-committee100.pantheonsite.io',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
