@@ -1,4 +1,4 @@
-# Valorea — Maintenance Regression Suite (ESM)
+# Committee of 100 — Maintenance Regression Suite (ESM)
 
 Playwright suite for `test-valorea.pantheonsite.io`, meant to be run after a
 plugin update to confirm nothing on these pages broke:
