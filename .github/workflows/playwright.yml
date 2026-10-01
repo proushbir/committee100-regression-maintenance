@@ -1,0 +1,106 @@
+name: Playwright Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Nightly trip-wire: catches regressions even without a PR/commit.
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+# Cancel superseded runs for the same branch/commit.
+concurrency:
+  group: playwright-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: '.nvmrc'
+        cache: 'npm'
+
+    - name: Install Dependencies
+      run: npm ci
+
+    - name: Cache Playwright Browsers
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps chromium
+
+    - name: Run Playwright Tests
+      env:
+        WP_ADMIN_USER: ${{ secrets.WP_ADMIN_USER }}
+        WP_ADMIN_PASS: ${{ secrets.WP_ADMIN_PASS }}
+        WP_TEST_RECIPIENT_EMAIL: ${{ secrets.WP_TEST_RECIPIENT_EMAIL }}
+      run: npx playwright test
+
+    - name: Upload Snapshots
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: updated-snapshots
+        path: tests/**/*-snapshots/**
+        retention-days: 7
+
+    - name: Upload Test Results
+      uses: actions/upload-artifact@v4
+      if: ${{ !cancelled() }}
+      with:
+        name: playwright-report
+        path: playwright-report/
+        retention-days: 30
+      - name: Notify Slack with Test Results
+        if: always()
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*GitHub Actions Test Run Complete* :rocket:\n*Repository:* ${{ github.repository }}\n*Status:* ${{ needs.test.result }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*📊 Playwright Test Summary*\n*Total:* ${{ needs.test.outputs.total }}\n*Passed:* :white_check_mark: ${{ needs.test.outputs.passed }}\n*Failed:* :x: ${{ needs.test.outputs.failed }}\n*Skipped:* :fast_forward: ${{ needs.test.outputs.skipped }}"
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Workflow Run"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK  
+          

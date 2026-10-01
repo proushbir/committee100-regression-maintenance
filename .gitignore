@@ -1,0 +1,11 @@
+node_modules/
+.env
+test-results/
+playwright-report/
+screenshots/
+.playwright-mcp/
+.DS_Store
+session-*.md
+*.log
+tests/**/*-snapshots/**/*-actual.png
+tests/**/*-snapshots/**/*-diff.png
